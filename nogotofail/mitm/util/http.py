@@ -55,9 +55,7 @@ def parse_request(request):
     if not re.match(".*HTTP/.*\r\n", request):
         return None
     http = HTTPRequest(request)
-    if http.error_code:
-        return None
-    return http
+    return None if http.error_code else http
 
 
 def parse_response(response):

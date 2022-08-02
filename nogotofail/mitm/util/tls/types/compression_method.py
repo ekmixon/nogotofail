@@ -31,11 +31,7 @@ class CompressionMethod(object):
         return CompressionMethod(value), 1
 
     def __str__(self):
-        name = self.name
-        if name:
-            return name
-        else:
-            return "0x%x" % self.value
+        return name if (name := self.name) else "0x%x" % self.value
 
     def to_bytes(self):
         return struct.pack("B", self.value)

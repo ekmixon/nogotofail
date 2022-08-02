@@ -81,10 +81,11 @@ class ServerKeyReplacementMITM(LoggingHandler):
             if self.signature_tampered:
                 # The client MUST reply with an alert and close the connection.
                 # Just closing the connection is also acceptable.
-                if not self.first_alert_received_after_tampering:
-                    if isinstance(message, Alert):
-                        self.first_alert_received_after_tampering = message
-                        return request
+                if not self.first_alert_received_after_tampering and isinstance(
+                    message, Alert
+                ):
+                    self.first_alert_received_after_tampering = message
+                    return request
 
                 self.vuln_detected = True
                 self.log(

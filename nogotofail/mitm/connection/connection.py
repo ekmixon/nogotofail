@@ -168,8 +168,10 @@ class BaseConnection(object):
         data_handler_classes = data_handler_selector(self, app_blame)
         self.data_handlers = [handler_class(self)
                               for handler_class in data_handler_classes]
-        self.logger.debug("Using data handlers %s" %
-                ', '.join([handler.name for handler in self.data_handlers]))
+        self.logger.debug(
+            f"Using data handlers {', '.join([handler.name for handler in self.data_handlers])}"
+        )
+
 
         self.client_bridge_fn = self._bridge_client
         self.server_bridge_fn = self._bridge_server
@@ -227,8 +229,9 @@ class BaseConnection(object):
 
         This should be set as the server_bridge_fn before calling socket.connect
         on a non-blocking server_socket."""
-        error = self.server_socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
-        if error:
+        if error := self.server_socket.getsockopt(
+            socket.SOL_SOCKET, socket.SO_ERROR
+        ):
             self.logger.info("Failed to connect to endpoint %s:%s errno %s",
                     self.server_addr, self.server_port, error)
             return False
@@ -411,7 +414,7 @@ class BaseConnection(object):
         if record:
             first = record.messages[0]
             if isinstance(first, tls.types.HandshakeMessage)\
-               and isinstance(first.obj, tls.types.ClientHello):
+                   and isinstance(first.obj, tls.types.ClientHello):
                 client_hello = first.obj
         else:
            # Check for an SSLv2 Client Hello
@@ -419,9 +422,7 @@ class BaseConnection(object):
            if record and isinstance(record.message.obj, ssl2.types.ClientHello):
                client_hello = record.message.obj
 
-        if not client_hello:
-            return False
-        return self._handle_hello(client_hello)
+        return self._handle_hello(client_hello) if client_hello else False
 
     def _handle_hello(self, client_hello):
         """ Handles the changing of handlers on a TLS client hello and optional mitm
@@ -430,15 +431,15 @@ class BaseConnection(object):
         """
         # Check for a server name and set our hostname
         if not self.hostname:
-            server_name = client_hello.extensions.get(Extension.TYPE.SERVER_NAME)
-            if server_name:
+            if server_name := client_hello.extensions.get(
+                Extension.TYPE.SERVER_NAME
+            ):
                 server_name = server_name.data
                 self.hostname = server_name
 
-        # Swap to a new handler if needed.
-        handler_class = self.ssl_handler_selector(
-            self, client_hello, self.app_blame)
-        if handler_class:
+        if handler_class := self.ssl_handler_selector(
+            self, client_hello, self.app_blame
+        ):
             handler = handler_class(self)
             self.handler.on_remove()
             self.handler = handler
@@ -459,18 +460,14 @@ class BaseConnection(object):
         try:
             try:
                 client_request = self.client_socket.recv(65536, socket.MSG_PEEK)
-                handled = self.handler.peek_request(client_request)
-                if handled:
+                if handled := self.handler.peek_request(client_request):
                     return not self.closed
                 for handler in self.data_handlers:
                     if handler.peek_request(client_request):
                         return not self.closed
                 # Check for a TLS client hello we might need to intercept
-                if not self.ssl:
-                    # If a MiTM was attempted discard client_request, we used it
-                    # for establishing a MiTM with the client.
-                    if self._check_for_ssl(client_request):
-                        return not self.closed
+                if not self.ssl and self._check_for_ssl(client_request):
+                    return not self.closed
                 client_request = self.client_socket.recv(65536)
             except (socket.error, SSL.WantReadError):
                 # recv can still time out even if select returned this socket
@@ -506,8 +503,7 @@ class BaseConnection(object):
         try:
             try:
                 server_response = self.server_socket.recv(65536, socket.MSG_PEEK)
-                handled = self.handler.peek_response(server_response)
-                if handled:
+                if handled := self.handler.peek_response(server_response):
                     return not self.closed
                 for handler in self.data_handlers:
                     if handler.peek_response(server_response):
@@ -619,7 +615,7 @@ class BaseConnection(object):
         if self._applications is None:
             return False
         info, apps = self._applications
-        destination = self.hostname if self.hostname else self.server_addr
+        destination = self.hostname or self.server_addr
 
         return self.app_blame.vuln_notify_async(
             self.client_addr, destination, self.server_port, self.id, type,
@@ -704,8 +700,9 @@ class RedirectConnection(BaseConnection):
         # that.
         if self.server.is_remote_mitm_server(self.server_addr, self.server_port):
             self.logger.warning(
-                "Client %s attempting to connect to MiTM directly, aborting connection." %
-                (self.client_addr))
+                f"Client {self.client_addr} attempting to connect to MiTM directly, aborting connection."
+            )
+
             close_quietly(self.client_socket)
             return False
 

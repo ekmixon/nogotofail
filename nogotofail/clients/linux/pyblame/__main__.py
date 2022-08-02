@@ -106,7 +106,7 @@ def fingerprint_callback(fingerprint):
 
     if config.has_option("trusted_servers", config_print):
         return True
-    response = raw_input("Connect to %s y/N? " % fingerprint)
+    response = raw_input(f"Connect to {fingerprint} y/N? ")
     if response:
         config.set("trusted_servers", config_print, "trusted")
     return response == "y"
@@ -114,10 +114,21 @@ def fingerprint_callback(fingerprint):
 def vulnerability_callback(id, type, server_addr, server_port, applications):
     """Called when a vulnerability is reported
     """
-    logger.critical("Vulnerability %s in connection %s to %s:%s by %s"
-            % (type, id, server_addr, server_port,
-                ", ".join("%s version %s" % (app.application, app.version)
-                    for app in applications)))
+    logger.critical(
+        (
+            "Vulnerability %s in connection %s to %s:%s by %s"
+            % (
+                type,
+                id,
+                server_addr,
+                server_port,
+                ", ".join(
+                    f"{app.application} version {app.version}"
+                    for app in applications
+                ),
+            )
+        )
+    )
 
 def client_info_callback(source_port, dest_ip, dest_port):
     """Called when client information is requested.
@@ -131,23 +142,21 @@ def client_info_callback(source_port, dest_ip, dest_port):
                 relaxed=True)
         # API for cmdline changed in psutil 2.0.0, no reason to require >=2.0.0
         # so just work around it.
-        if psutil.version_info[0] < 2:
-            cmdline = proc.cmdline
-        else:
-            cmdline = proc.cmdline()
+        cmdline = proc.cmdline if psutil.version_info[0] < 2 else proc.cmdline()
         # Use the exe and argv[1] to get a good idea of the program.
         # This handles the python case where argv[0] is python and argv[1] is
         # the script.
         cmd = " ".join(cmdline[:2])
 
-        logger.info("Blame request for %s=>%s:%s owner:%s command:%s"
-                % (source_port, dest_ip, dest_port, proc.pid, cmd))
+        logger.info(
+            f"Blame request for {source_port}=>{dest_ip}:{dest_port} owner:{proc.pid} command:{cmd}"
+        )
+
         # TODO: Return a meaningful version code?
         return [pyblame.blame.Application(cmd, 0)]
 
     except ValueError:
-        logger.info("Blame request for %s=>%s:%s unknown"
-                % (source_port, dest_ip, dest_port))
+        logger.info(f"Blame request for {source_port}=>{dest_ip}:{dest_port} unknown")
 
     return None
 def main():

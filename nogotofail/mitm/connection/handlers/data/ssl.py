@@ -83,10 +83,7 @@ class _TlsRecordHandler(DataHandler):
                 return out
             if not record:
                 return out
-            record_bytes = record_fn(record)
-            # In a passive handler on_tls_* could return None, so make sure not to cause an error
-            # out doesn't matter on a passive handler.
-            if record_bytes:
+            if record_bytes := record_fn(record):
                 out += record_bytes
             # Once we read a CHANGE_CIPHER_SPEC stop trying to buffer, its probably encrypted
             if record.content_type == record.CONTENT_TYPE.CHANGE_CIPHER_SPEC:
@@ -94,14 +91,20 @@ class _TlsRecordHandler(DataHandler):
         return out
 
     def on_request(self, request):
-        if not self.ssl:
-            return request
-        return self._handle_message(request, self.client_buffer, self.on_tls_request)
+        return (
+            self._handle_message(request, self.client_buffer, self.on_tls_request)
+            if self.ssl
+            else request
+        )
 
     def on_response(self, response):
-        if not self.ssl:
-            return response
-        return self._handle_message(response, self.server_buffer, self.on_tls_response)
+        return (
+            self._handle_message(
+                response, self.server_buffer, self.on_tls_response
+            )
+            if self.ssl
+            else response
+        )
 
 @handler.passive(handlers)
 class InsecureCipherDetectionHandler(DataHandler):
@@ -115,34 +118,40 @@ class InsecureCipherDetectionHandler(DataHandler):
 
     def on_ssl(self, client_hello):
 
-        # Check for anon ciphers, these don't verify the identity of the
-        # endpoint
-        anon_ciphers = [str(c) for c in client_hello.ciphers if "_anon_" in str(c)]
-        if anon_ciphers:
-            self._handle_bad_ciphers(anon_ciphers,
-                "Client enabled anonymous TLS/SSL cipher suites %s" %
-                (", ".join(anon_ciphers)))
+        if anon_ciphers := [
+            str(c) for c in client_hello.ciphers if "_anon_" in str(c)
+        ]:
+            self._handle_bad_ciphers(
+                anon_ciphers,
+                f'Client enabled anonymous TLS/SSL cipher suites {", ".join(anon_ciphers)}',
+            )
 
-        # Check for NULL encryption ciphers
-        null_ciphers = [str(c) for c in client_hello.ciphers if "_WITH_NULL_" in str(c)]
-        if null_ciphers:
-            self._handle_bad_ciphers(null_ciphers,
-                "Client enabled NULL encryption TLS/SSL cipher suites %s" %
-                (", ".join(null_ciphers)))
 
-        # Check for NULL integrity ciphers
-        integ_ciphers =  [str(c) for c in client_hello.ciphers if str(c).endswith("_NULL")]
-        if integ_ciphers:
-            self._handle_bad_ciphers(integ_ciphers,
-                "Client enabled NULL integrity TLS/SSL cipher suites %s" %
-                (", ".join(integ_ciphers)))
+        if null_ciphers := [
+            str(c) for c in client_hello.ciphers if "_WITH_NULL_" in str(c)
+        ]:
+            self._handle_bad_ciphers(
+                null_ciphers,
+                f'Client enabled NULL encryption TLS/SSL cipher suites {", ".join(null_ciphers)}',
+            )
 
-        # Check for export ciphers since they're horribly weak
-        export_ciphers = [str(c) for c in client_hello.ciphers if "EXPORT" in str(c)]
-        if export_ciphers:
-            self._handle_bad_ciphers(export_ciphers,
-                "Client enabled export TLS/SSL cipher suites %s" %
-                (", ".join(export_ciphers)))
+
+        if integ_ciphers := [
+            str(c) for c in client_hello.ciphers if str(c).endswith("_NULL")
+        ]:
+            self._handle_bad_ciphers(
+                integ_ciphers,
+                f'Client enabled NULL integrity TLS/SSL cipher suites {", ".join(integ_ciphers)}',
+            )
+
+
+        if export_ciphers := [
+            str(c) for c in client_hello.ciphers if "EXPORT" in str(c)
+        ]:
+            self._handle_bad_ciphers(
+                export_ciphers,
+                f'Client enabled export TLS/SSL cipher suites {", ".join(export_ciphers)}',
+            )
 
 
 @handler.passive(handlers)

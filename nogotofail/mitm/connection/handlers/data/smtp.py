@@ -76,7 +76,7 @@ class SmtpStartTlsStripHandler(DataHandler):
                 # STARTTLS line was the last line -- drop it and modify the
                 # preceding line as required by the protocol.
                 lines = lines[:starttls_line_index]
-                lines[-1] = lines[-1][0:3] + " " + lines[-1][4:]
+                lines[-1] = lines[-1][:3] + " " + lines[-1][4:]
             else:
                 # STARTTLS line was not the last line -- just drop it.
                 lines = lines[:starttls_line_index] + lines[starttls_line_index + 1:]
@@ -92,12 +92,11 @@ class SmtpStartTlsStripHandler(DataHandler):
         if not self.smtp_detected:
             return request
 
-        if not self.ehlo_detected:
-            if bool(self.ehlo_pattern.match(request)):
-                self.ehlo_detected = True
-                self.ehlo_response_pending = True
-                self.log(logging.DEBUG, "SMTP EHLO detected")
-                return request
+        if not self.ehlo_detected and bool(self.ehlo_pattern.match(request)):
+            self.ehlo_detected = True
+            self.ehlo_response_pending = True
+            self.log(logging.DEBUG, "SMTP EHLO detected")
+            return request
 
         if self.ehlo_detected:
             if request.lower().startswith("starttls"):
@@ -152,12 +151,11 @@ class SmtpAuthHandler(DataHandler):
         if not self.smtp_detected:
             return request
 
-        if not self.ehlo_detected:
-            if bool(self.ehlo_pattern.match(request)):
-                self.ehlo_detected = True
-                self.ehlo_response_pending = True
-                self.log(logging.DEBUG, "SMTP EHLO detected")
-                return request
+        if not self.ehlo_detected and bool(self.ehlo_pattern.match(request)):
+            self.ehlo_detected = True
+            self.ehlo_response_pending = True
+            self.log(logging.DEBUG, "SMTP EHLO detected")
+            return request
 
         if not self.ehlo_detected:
             return request

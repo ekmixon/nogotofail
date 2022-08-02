@@ -19,6 +19,4 @@ extras_dir = None
 
 def get_extras_path(file_path):
     """ Return a full path to file_path in the extras directory."""
-    if extras_dir is None:
-        return file_path
-    return os.path.join(extras_dir, file_path)
+    return file_path if extras_dir is None else os.path.join(extras_dir, file_path)

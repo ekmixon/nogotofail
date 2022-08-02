@@ -66,9 +66,11 @@ class BlameConnection(object):
     def build_headers(self):
         """Create the dictionary headers to send the server in the handshake.
         """
-        headers = {}
-        headers["Installation-ID"] = self.install_id
-        headers["Platform-Info"] = self.platform_info
+        headers = {
+            "Installation-ID": self.install_id,
+            "Platform-Info": self.platform_info,
+        }
+
         if self.attacks is not None:
             headers["Attacks"] = ",".join(self.attacks)
         if self.data_attacks is not None:
@@ -86,9 +88,18 @@ class BlameConnection(object):
             raise ValueError("Connection not created before call to handshake")
         headers = self.build_headers()
         f = self.blame_sock.makefile()
-        f.write("nogotofail_ctl/1.0\n" +
-                "\n".join(("%s: %s" % (key, value) for key, value in headers.iteritems())) +
-                "\n\n")
+        f.write(
+            (
+                (
+                    "nogotofail_ctl/1.0\n"
+                    + "\n".join(
+                        f"{key}: {value}" for key, value in headers.iteritems()
+                    )
+                )
+                + "\n\n"
+            )
+        )
+
         f.flush()
 
         line = f.readline().strip()
@@ -148,7 +159,6 @@ class BlameConnection(object):
         """
         source_port = int(params[0])
         dest_ip = None
-        dest_port = -1
         if len(params) > 1:
             dest_ip_bytes = params[1].decode("hex")
             if len(dest_ip_bytes) == 4:
@@ -158,13 +168,14 @@ class BlameConnection(object):
             else:
                 raise ValueError("Wrong size dest_ip")
             dest_ip = socket.inet_ntop(family, dest_ip_bytes)
-        if len(params) > 2:
-            dest_port = int(params[2])
+        dest_port = int(params[2]) if len(params) > 2 else -1
         if self.info_callback:
-            applications = self.info_callback(source_port, dest_ip, dest_port)
-            if applications:
-                return ", ".join(("%s %s" % (urllib.quote(app.application), app.version)
-                    for app in applications))
+            if applications := self.info_callback(source_port, dest_ip, dest_port):
+                return ", ".join(
+                    f"{urllib.quote(app.application)} {app.version}"
+                    for app in applications
+                )
+
         return ""
 
     command_handlers = {

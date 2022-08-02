@@ -27,7 +27,7 @@ class CertificateAuthority(object):
     def __init__(self, ca_file='ca.pem', cert_dir=None):
         self.ca_file = ca_file
         if cert_dir is None:
-            cert_dir = tempfile.mkdtemp(prefix="ngtf_ca_" + ca_file)
+            cert_dir = tempfile.mkdtemp(prefix=f"ngtf_ca_{ca_file}")
             atexit.register(shutil.rmtree, cert_dir)
         self.cert_dir = cert_dir
         self._loaded = False
@@ -123,7 +123,7 @@ class CertificateAuthority(object):
     def _get_file_name(self, cn, san):
         san_str = san.get_data() if san else ''
         name_hash = hash(cn + san_str)
-        return "._cert_%s_%s.pem" % (os.path.basename(self.ca_file), name_hash)
+        return f"._cert_{os.path.basename(self.ca_file)}_{name_hash}.pem"
 
 
     def get_cert(self, cn, san):

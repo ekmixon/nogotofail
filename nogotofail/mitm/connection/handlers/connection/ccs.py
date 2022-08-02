@@ -56,13 +56,7 @@ class EarlyCCS(LoggingHandler):
                         ext.raw_data = []
                 return record.to_bytes()
             if self.injected_server:
-                # OpenSSL after the EarlyCCS fix should send a fatal alert
-                # unexpected_message (10). Some other libraries send a close_notify (0)
-                # so we accept that as well. Morever, if the client doesn't like the TLS
-                # protocol version chosen by the server (regardless of whether early
-                # CCS is injected), the client will send a fatal alert
-                # protocol_version (70).
-                if not (
+                if (
                     isinstance(message, tls.types.Alert) and
                        ((message.description == Alert.DESCRIPTION.UNEXPECTED_MESSAGE and
                            message.level == Alert.LEVEL.FATAL) or
@@ -70,18 +64,18 @@ class EarlyCCS(LoggingHandler):
                            message.level == Alert.LEVEL.FATAL) or
                        message.description == Alert.DESCRIPTION.CLOSE_NOTIFY)):
                     self.log(
+                        logging.DEBUG,
+                        "Client not vulnerable to early CCS")
+                    self.log_attack_event(success=False)
+
+                else:
+                    self.log(
                         logging.CRITICAL,
                         "Client is vulnerable to Early CCS attack!")
                     self.connection.vuln_notify(util.vuln.VULN_EARLY_CCS)
                     self.log_attack_event()
 
                     self.connection.close()
-                else:
-                    self.log(
-                        logging.DEBUG,
-                        "Client not vulnerable to early CCS")
-                    self.log_attack_event(success=False)
-
         except ValueError:
             # Failed to parse TLS, this is probably due to a short read of a TLS
             # record.
@@ -102,9 +96,7 @@ class EarlyCCS(LoggingHandler):
             version,
             record.messages[:hello_message_index + 1])
 
-        # Split the record if there are more messages after the ServerHello.
-        remaining = record.messages[hello_message_index + 1:]
-        if remaining:
+        if remaining := record.messages[hello_message_index + 1 :]:
             rest = TlsRecord(
                 TlsRecord.CONTENT_TYPE.HANDSHAKE,
                 version,

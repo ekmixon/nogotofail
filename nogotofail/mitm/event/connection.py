@@ -42,14 +42,11 @@ class ConnectionEvent(Event):
         self.server_port = connection.server_port
         if connection.hostname:
             self.hostname = connection.hostname
-        # Use the cached value only, don't force a lookup
-        blame_info = connection.applications(cached_only=True)
-        if blame_info:
+        if blame_info := connection.applications(cached_only=True):
             self.platform_info = blame_info[0]
             self.applications = [(app.package, app.version)
                                  for app in blame_info[1]]
-        client = connection.client_info
-        if client:
+        if client := connection.client_info:
             if "Installation-ID" in client.info:
                 self.installation_id = client.info["Installation-ID"]
         self.handler = connection.handler.name

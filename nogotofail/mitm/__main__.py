@@ -67,9 +67,8 @@ def build_ssl_selector(default_ssl_handlers, prob_MITM=0.5, MITM_all=False):
             ssl_handlers = default_ssl_handlers
         if not ssl_handlers:
             return None
-        if random.random() < attack_prob:
-            return random.choice(ssl_handlers)
-        return None
+        return random.choice(ssl_handlers) if random.random() < attack_prob else None
+
     return attack_selector
 
 
@@ -178,18 +177,27 @@ def parse_args():
     else:
         config = {}
 
-    modes_str = ("Supported modes:\n" +
-                   "\n".join(["\n\t".join(
-                       textwrap.wrap("%s - %s" % (name, mode.description), 80))
-                              for name, mode in modes.items()]))
-    attacks_str = ("Supported attacks:\n" +
-                   "\n".join(["\n\t".join(
-                       textwrap.wrap("%s - %s" % (name, handler.description), 80))
-                              for name, handler in handlers.connection.handlers.map.items()]))
-    data_str = ("Supported data handlers:\n" +
-                "\n".join(["\n\t".join(
-                    textwrap.wrap("%s - %s" % (name, handler.description), 80))
-                           for name, handler in handlers.data.handlers.map.items()]))
+    modes_str = "Supported modes:\n" + "\n".join(
+        [
+            "\n\t".join(textwrap.wrap(f"{name} - {mode.description}", 80))
+            for name, mode in modes.items()
+        ]
+    )
+
+    attacks_str = "Supported attacks:\n" + "\n".join(
+        [
+            "\n\t".join(textwrap.wrap(f"{name} - {handler.description}", 80))
+            for name, handler in handlers.connection.handlers.map.items()
+        ]
+    )
+
+    data_str = "Supported data handlers:\n" + "\n".join(
+        [
+            "\n\t".join(textwrap.wrap(f"{name} - {handler.description}", 80))
+            for name, handler in handlers.data.handlers.map.items()
+        ]
+    )
+
     epilog = "\n\n".join([modes_str, attacks_str, data_str])
     parser = (
         argparse.ArgumentParser(
@@ -328,7 +336,7 @@ def run():
             try:
                 mode.setup(args)
             except ValueError as e:
-                print("Error: %s" % e.message)
+                print(f"Error: {e.message}")
                 sys.exit(2)
 
         blame = (

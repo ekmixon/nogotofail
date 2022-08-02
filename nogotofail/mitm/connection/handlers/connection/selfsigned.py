@@ -36,8 +36,7 @@ class SelfSignedMITM(LoggingHandler):
 
     def on_request(self, request):
         if not self.success and self.ssl:
-            self.log(logging.CRITICAL, "MITM Success! Cert file: %s"
-                     % (self.certificate))
+            self.log(logging.CRITICAL, f"MITM Success! Cert file: {self.certificate}")
             self.log_event(
                 logging.CRITICAL,
                 connection.AttackEvent(
@@ -49,8 +48,7 @@ class SelfSignedMITM(LoggingHandler):
 
     def on_response(self, response):
         if not self.success and self.ssl:
-            self.log(logging.CRITICAL, "MITM Success! Cert file: %s"
-                     % (self.certificate))
+            self.log(logging.CRITICAL, f"MITM Success! Cert file: {self.certificate}")
             self.log_event(
                 logging.CRITICAL,
                 connection.AttackEvent(
@@ -82,7 +80,7 @@ class SelfSignedMITM(LoggingHandler):
                       for i in range(server_cert.get_extension_count())]
         altnames = [extension for extension in extensions
                     if extension.get_short_name() == "subjectAltName"]
-        san = altnames[0] if len(altnames) > 0 else None
+        san = altnames[0] if altnames else None
         self.certificate = self.ca.get_cert(cn, san)
         return self.certificate
 

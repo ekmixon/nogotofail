@@ -57,9 +57,11 @@ class XmppStartTlsStripHandler(DataHandler):
 
         if self.starttls_feature_stripped:
             # Ignore/pass through starttls, proceed, and failure messages
-            if (data == '<starttls xmlns="urn:ietf:params:xml:ns:xmpp-tls"/>' or
-                data == '<proceed xmlns="urn:ietf:params:xml:ns:xmpp-tls"/>' or
-                data == '<failure xmlns="urn:ietf:params:xml:ns:xmpp-tls"/>'):
+            if data in [
+                '<starttls xmlns="urn:ietf:params:xml:ns:xmpp-tls"/>',
+                '<proceed xmlns="urn:ietf:params:xml:ns:xmpp-tls"/>',
+                '<failure xmlns="urn:ietf:params:xml:ns:xmpp-tls"/>',
+            ]:
                 return data
 
             if not self.vuln_notified:
@@ -105,9 +107,12 @@ class XmppStartTlsStripHandler(DataHandler):
         if end_index != -1:
             end_index += len("/starttls>")
         end_index2 = data.find(">", start_index)
-        if end_index2 != -1 and data[end_index2 - 1] == '/':
-            if end_index == -1 or end_index2 < end_index:
-                end_index = end_index2
+        if (
+            end_index2 != -1
+            and data[end_index2 - 1] == '/'
+            and (end_index == -1 or end_index2 < end_index)
+        ):
+            end_index = end_index2
         return data[:start_index] + data[end_index:]
 
 

@@ -43,9 +43,8 @@ def _build_precondition_join_fn(cls, fn):
     old_precondition = cls.check_precondition
     def check_precondition():
         result, message = fn()
-        if not result:
-            return result, message
-        return old_precondition()
+        return old_precondition() if result else (result, message)
+
     return staticmethod(check_precondition)
 
 def requires_files(files):
@@ -56,9 +55,11 @@ def requires_files(files):
     def check_files_precondition():
         for file in files:
             if not os.path.exists(extras.get_extras_path(file)):
-                return False, "required file %s not found" % (file)
+                return False, f"required file {file} not found"
         return True, ""
+
     def wrapper(cls):
         cls.check_precondition = _build_precondition_join_fn(cls, check_files_precondition)
         return cls
+
     return wrapper

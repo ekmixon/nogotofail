@@ -28,21 +28,21 @@ def run_command(command, ignore_failed=False):
             raise e
 
 def run_iptables_cmd(command, ipv4=True, ipv6=False, ignore_failed=False):
-    ipv4_bin = "iptables"
-    ipv6_bin = "ip6tables"
-
     if ipv4:
-        run_command(ipv4_bin + " " + command, ignore_failed)
+        ipv4_bin = "iptables"
+        run_command(f"{ipv4_bin} {command}", ignore_failed)
     if ipv6:
-        run_command(ipv6_bin + " " + command, ignore_failed)
+        ipv6_bin = "ip6tables"
+
+        run_command(f"{ipv6_bin} {command}", ignore_failed)
 
 def run_ip_cmd(command, ipv4=True, ipv6=False, ignore_failed=True):
-    ipv4_bin = "ip -4"
-    ipv6_bin = "ip -6"
     if ipv4:
-        run_command(ipv4_bin + " " + command, ignore_failed)
+        ipv4_bin = "ip -4"
+        run_command(f"{ipv4_bin} {command}", ignore_failed)
     if ipv6:
-        run_command(ipv6_bin + " " + command, ignore_failed)
+        ipv6_bin = "ip -6"
+        run_command(f"{ipv6_bin} {command}", ignore_failed)
 
 def add_local_bypass(table, chain, ipv6):
     """Add rules to skip anything destined for a local address
@@ -50,27 +50,36 @@ def add_local_bypass(table, chain, ipv6):
     SSH and that would be bad if ngtf is running on a remote server.
     """
     run_iptables_cmd(
-            "-t %s -A %s -p tcp -m socket -j RETURN" % (table, chain), ipv6=ipv6)
+        f"-t {table} -A {chain} -p tcp -m socket -j RETURN", ipv6=ipv6
+    )
+
 
     v4_addrs, v6_addrs = get_interface_addresses()
     for addr in v4_addrs:
         run_iptables_cmd(
-                "-t %s -A %s -p tcp -d %s -j RETURN" % (table, chain, addr),
-                ipv6=False)
+            f"-t {table} -A {chain} -p tcp -d {addr} -j RETURN", ipv6=False
+        )
+
     for addr in v6_addrs:
         run_iptables_cmd(
-                "-t %s -A %s -p tcp -d %s -j RETURN" % (table, chain, addr),
-                ipv4=False, ipv6=ipv6)
+            f"-t {table} -A {chain} -p tcp -d {addr} -j RETURN",
+            ipv4=False,
+            ipv6=ipv6,
+        )
 
 TPROXY_CHAIN = "ngtf_mangle_PREROUTING"
 
 def disable_tproxy_rules(ipv6=False, mark=100):
     run_ip_cmd("rule del fwmark %d table %d" % (mark, mark),
             ipv6=ipv6, ignore_failed=True)
-    run_iptables_cmd("-t mangle -D PREROUTING -j %s" % TPROXY_CHAIN,
-            ipv6=ipv6, ignore_failed=True)
-    run_iptables_cmd("-t mangle -F %s" % TPROXY_CHAIN, ipv6=ipv6, ignore_failed=True)
-    run_iptables_cmd("-t mangle -X %s" % TPROXY_CHAIN, ipv6=ipv6, ignore_failed=True)
+    run_iptables_cmd(
+        f"-t mangle -D PREROUTING -j {TPROXY_CHAIN}",
+        ipv6=ipv6,
+        ignore_failed=True,
+    )
+
+    run_iptables_cmd(f"-t mangle -F {TPROXY_CHAIN}", ipv6=ipv6, ignore_failed=True)
+    run_iptables_cmd(f"-t mangle -X {TPROXY_CHAIN}", ipv6=ipv6, ignore_failed=True)
 
 
 def enable_tproxy_rules(port, ipv6=False, mark=100):
@@ -78,12 +87,11 @@ def enable_tproxy_rules(port, ipv6=False, mark=100):
     try:
         run_ip_cmd("rule add fwmark %d table %d" % (mark, mark), ipv6=ipv6)
         run_ip_cmd("route add local default dev lo table %d" % mark, ipv6=ipv6)
-        run_iptables_cmd("-t mangle -N %s" % TPROXY_CHAIN, ipv6=ipv6)
+        run_iptables_cmd(f"-t mangle -N {TPROXY_CHAIN}", ipv6=ipv6)
 
         add_local_bypass("mangle", TPROXY_CHAIN, ipv6)
 
-        run_iptables_cmd(
-                "-t mangle -A PREROUTING --jump %s" % TPROXY_CHAIN, ipv6=ipv6)
+        run_iptables_cmd(f"-t mangle -A PREROUTING --jump {TPROXY_CHAIN}", ipv6=ipv6)
 
         run_iptables_cmd(
                 "-t mangle -A %s -p tcp -j TPROXY --tproxy-mark %d --on-port %d" %
@@ -95,23 +103,28 @@ def enable_tproxy_rules(port, ipv6=False, mark=100):
 
 REDIRECT_CHAIN = "ngtf_nat_PREROUTING"
 def disable_redirect_rules(ipv6=False):
-    run_iptables_cmd("-t nat -D PREROUTING -j %s" % REDIRECT_CHAIN,
-            ipv6=ipv6, ignore_failed=True)
-    run_iptables_cmd("-t nat -F %s" % REDIRECT_CHAIN, ipv6=ipv6, ignore_failed=True)
-    run_iptables_cmd("-t nat -X %s" % REDIRECT_CHAIN, ipv6=ipv6, ignore_failed=True)
+    run_iptables_cmd(
+        f"-t nat -D PREROUTING -j {REDIRECT_CHAIN}",
+        ipv6=ipv6,
+        ignore_failed=True,
+    )
+
+    run_iptables_cmd(f"-t nat -F {REDIRECT_CHAIN}", ipv6=ipv6, ignore_failed=True)
+    run_iptables_cmd(f"-t nat -X {REDIRECT_CHAIN}", ipv6=ipv6, ignore_failed=True)
 
 def enable_redirect_rules(port, ipv6=False):
     disable_redirect_rules(ipv6=ipv6)
     try:
-        run_iptables_cmd("-t nat -N %s" % REDIRECT_CHAIN, ipv6=ipv6)
+        run_iptables_cmd(f"-t nat -N {REDIRECT_CHAIN}", ipv6=ipv6)
 
         add_local_bypass("nat", REDIRECT_CHAIN, ipv6)
-        run_iptables_cmd(
-                "-t nat -A PREROUTING --jump %s" % REDIRECT_CHAIN, ipv6=ipv6)
+        run_iptables_cmd(f"-t nat -A PREROUTING --jump {REDIRECT_CHAIN}", ipv6=ipv6)
 
         run_iptables_cmd(
-                "-t nat -A %s -p tcp -j REDIRECT --to-ports %s" % (REDIRECT_CHAIN, port),
-                ipv6=ipv6)
+            f"-t nat -A {REDIRECT_CHAIN} -p tcp -j REDIRECT --to-ports {port}",
+            ipv6=ipv6,
+        )
+
     except Exception:
         logger.exception("Failed to setup routing rules")
         disable_redirect_rules(ipv6=ipv6)

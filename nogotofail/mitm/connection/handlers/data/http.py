@@ -89,11 +89,9 @@ class BufferedHttpHandler(DataHandler):
         return self._handle_buffering(data, buffer_state)
 
     def _get_data_length(self, data):
-        response = util.http.parse_response(data)
-        if response:
+        if response := util.http.parse_response(data):
             return int(response.getheader("content-length", 0))
-        request = util.http.parse_request(data)
-        if request:
+        if request := util.http.parse_request(data):
             return int(request.headers.get("content-length", 0))
 
     def _handle_buffering(self, data, buffer_state):
@@ -124,8 +122,7 @@ class HttpDetectionHandler(DataHandler):
 
     def on_http(self, http):
         host = http.headers.get("host", self.connection.server_addr)
-        self.log(logging.ERROR, "HTTP request %s %s"
-                 % (http.command, host + http.path))
+        self.log(logging.ERROR, f"HTTP request {http.command} {host + http.path}")
         self.log_event(
             logging.ERROR,
             connection.AttackEvent(
@@ -146,8 +143,9 @@ class HttpAuthHandler(HttpDetectionHandler):
         if auth:
             self.log(
                 logging.CRITICAL,
-                "Authorization header in HTTP request %s %s" %
-                (http.command, host + http.path))
+                f"Authorization header in HTTP request {http.command} {host + http.path}",
+            )
+
             self.log_event(
                 logging.ERROR,
                 connection.AttackEvent(
@@ -195,9 +193,7 @@ class _ResponseReplacement(DataHandler):
                 return ""
             request = request[self.skip:]
             self.skip = 0
-        if self.filter(request):
-            return self.replace(request)
-        return request
+        return self.replace(request) if self.filter(request) else request
 
 
 @handler(handlers, default=False)
@@ -253,8 +249,14 @@ class AndroidWebviewJsRce(_ResponseReplacement):
         payload = self.build_payload()
         contents = contents[:match.end()] + payload + contents[match.end():]
 
-        message = ("{version} 200 OK\r\n" + "\r\n".join(
-            ["%s: %s" % (k, v) for k, v in headers.items()]) + "\r\n\r\n" + "{data}")
+        message = (
+            (
+                "{version} 200 OK\r\n"
+                + "\r\n".join([f"{k}: {v}" for k, v in headers.items()])
+            )
+            + "\r\n\r\n"
+        ) + "{data}"
+
 
         headers["content-length"] = old_length + len(payload)
         version = "HTTP/1.0" if resp.version == 10 else "HTTP/1.1"
@@ -291,22 +293,24 @@ class SSLStrip(_ResponseReplacement):
         content_type = resp.getheader(
             "content-type", "").strip() if resp else ""
         return resp and (
-            (resp.status == 200 and any(
-                re.match(type, content_type)
-                for type in SSLStrip.content_types))
-            or (resp.status / 100 == 3  # 3XX are HTTP redirects
-                and resp.getheader("location", "").startswith("https://")))
+            (
+                resp.status == 200
+                and any(
+                    re.match(type, content_type) for type in SSLStrip.content_types
+                )
+            )
+            or resp.status == 300
+            and resp.getheader("location", "").startswith("https://")
+        )
 
     def replace(self, response):
         resp = util.http.parse_response(response)
         if resp.status == 200:
             return self.replace_ok(response)
-        elif resp.status / 100 == 3:
+        elif resp.status == 300:
             return self.replace_redirect(response)
         else:
-            self.log(
-                logging.FATAL,
-                "Unexpected status %s in SSLstrip replace" % resp.status)
+            self.log(logging.FATAL, f"Unexpected status {resp.status} in SSLstrip replace")
             return ""
 
     def build_report_callback(self, url):
@@ -343,21 +347,25 @@ class SSLStrip(_ResponseReplacement):
             url = match.group(0)
             callback = self.build_report_callback(url)
             # strip the https
-            url = "http://" + url[8:]
+            url = f"http://{url[8:]}"
             new_url = ClientReportDetection.add_callback_url(
                 callback, url, timeout=20)
             new_contents += contents[prev:match.start()] + new_url
             prev = match.end()
-            self.log(
-                logging.DEBUG,
-                "Replacing %s with %s" % (match.group(0), new_url))
+            self.log(logging.DEBUG, f"Replacing {match.group(0)} with {new_url}")
         new_contents += contents[prev:]
 
         headers["content-length"] = len(new_contents)
         version = "HTTP/1.0" if resp.version == 10 else "HTTP/1.1"
 
-        message = ("{version} 200 OK\r\n" + "\r\n".join(
-            ["%s: %s" % (k, v) for k, v in headers.items()]) + "\r\n\r\n" + "{data}")
+        message = (
+            (
+                "{version} 200 OK\r\n"
+                + "\r\n".join([f"{k}: {v}" for k, v in headers.items()])
+            )
+            + "\r\n\r\n"
+        ) + "{data}"
+
         data = message.format(version=version, data=new_contents)
 
         # Handle any extra data in response after the HTTP response
@@ -376,17 +384,21 @@ class SSLStrip(_ResponseReplacement):
         headers = dict(resp.getheaders())
         location = headers["location"]
         callback = self.build_report_callback(location)
-        new_location = "http://" + location[8:]
+        new_location = f"http://{location[8:]}"
         new_location = ClientReportDetection.add_callback_url(
             callback, new_location, timeout=5)
         headers["location"] = new_location
-        self.log(logging.DEBUG,
-                 "Replacing redirect to %s with %s" %
-                 (location, new_location))
+        self.log(
+            logging.DEBUG, f"Replacing redirect to {location} with {new_location}"
+        )
+
         version = "HTTP/1.0" if resp.version == 10 else "HTTP/1.1"
 
-        message = ("{version} {status} OK\r\n" + "\r\n".join(
-            ["%s: %s" % (k, v) for k, v in headers.items()]) + "\r\n\r\n")
+        message = (
+            "{version} {status} OK\r\n"
+            + "\r\n".join([f"{k}: {v}" for k, v in headers.items()])
+        ) + "\r\n\r\n"
+
         data = message.format(version=version, status=resp.status)
 
         # Handle any extra data in response after the HTTP response
@@ -427,8 +439,14 @@ class ImageReplacement(_ResponseReplacement):
         headers["content-length"] = length
         headers["content-type"] = "image/png"
 
-        message = ("{version} 200 OK\r\n" + "\r\n".join(
-            ["%s: %s" % (k, v) for k, v in headers.items()]) + "\r\n\r\n" + "{data}")
+        message = (
+            (
+                "{version} 200 OK\r\n"
+                + "\r\n".join([f"{k}: {v}" for k, v in headers.items()])
+            )
+            + "\r\n\r\n"
+        ) + "{data}"
+
         # HTTPResponse.version is kind of weird
         version = "HTTP/1.0" if resp.version == 10 else "HTTP/1.1"
         data = message.format(version=version, data=self.data)

@@ -32,8 +32,11 @@ class MitmLoop(object):
         while True:
             # Build the map of fds we are actively selecting over. This changes
             # from pass to pass and connections come and go and change state.
-            fds = {server: set([sock for fds in server.select_fds for sock in fds])
-                    for server in servers}
+            fds = {
+                server: {sock for fds in server.select_fds for sock in fds}
+                for server in servers
+            }
+
             r, w, x = [set().union(*l) for l in zip(*[server.select_fds for server in servers])]
             r, w, x = select.select(r, w, x, timeout)
             # Call on_select with all the fds we found from each server.

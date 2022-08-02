@@ -16,19 +16,19 @@ limitations under the License.
 
 class Constants(object):
     class _Meta(type):
-        def __getattr__(cls, attr):
-            if attr in cls.__dict__:
-                return cls.__dict__[attr]
-            if attr in cls._constants:
-                return cls._constants[attr]
+        def __getattr__(self, attr):
+            if attr in self.__dict__:
+                return self.__dict__[attr]
+            if attr in self._constants:
+                return self._constants[attr]
             else:
                 raise AttributeError(attr)
 
-        def __setattr__(cls, attr, value):
+        def __setattr__(self, attr, value):
             raise AttributeError("Cannot set constants")
 
-        def __dir__(cls):
-            return cls._constants.keys()
+        def __dir__(self):
+            return self._constants.keys()
 
     __metaclass__ = _Meta
 

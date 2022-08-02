@@ -69,7 +69,7 @@ class Extension(object):
         return name_map.get(self.type)
 
     def __str__(self):
-        return "%s" % (self.name if self.name else self.type)
+        return f"{self.name or self.type}"
 
     @staticmethod
     def from_stream(body):
@@ -89,16 +89,12 @@ class Extension(object):
         # currently only parsing SNI
         if type != 0:
             return data
-        if len(data) == 0:
+        if not data:
             return ""
         # parse out the SNI list
         size = struct.unpack_from("!H", data, 0)[0]
         snis = parse.parse_tls_list(data[2:], size, _parse_sni)[0]
-        for sni in snis:
-            if sni[0] == 0:
-                return sni[1]
-        # Didn't parse out a server name?
-        return ""
+        return next((sni[1] for sni in snis if sni[0] == 0), "")
 
 
 def _parse_sni(data):

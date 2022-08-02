@@ -26,7 +26,7 @@ class Cipher(object):
     @property
     def name(self):
         result = name_map.get(self.bytes)
-        if not result is None:
+        if result is not None:
             return result
         if self.bytes[0] == 0:
             # SSLv3 or newer cipher suite
@@ -39,11 +39,7 @@ class Cipher(object):
         return Cipher(cipher), 3
 
     def __str__(self):
-        name = self.name
-        if name:
-            return name
-        else:
-            return "(0x%x,0x%x,0x%x)" % self.bytes
+        return name if (name := self.name) else "(0x%x,0x%x,0x%x)" % self.bytes
 
     def to_bytes(self):
         return struct.pack("BBB", *self.bytes)

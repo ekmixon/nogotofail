@@ -31,11 +31,7 @@ class Cipher(object):
         return Cipher(cipher), 2
 
     def __str__(self):
-        name = self.name
-        if name:
-            return name
-        else:
-            return "(0x%x,0x%x)" % self.bytes
+        return name if (name := self.name) else "(0x%x,0x%x)" % self.bytes
 
     def to_bytes(self):
         return struct.pack("BB", *self.bytes)

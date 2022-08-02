@@ -79,10 +79,10 @@ class Client(object):
         now = time.time()
         if now - self.last_used > self.CLIENT_TIMEOUT:
             return False
-        for callback in self.queries.values():
-            if now >= callback.start + callback.timeout and callback.timeout != 0:
-                return False
-        return True
+        return not any(
+            now >= callback.start + callback.timeout and callback.timeout != 0
+            for callback in self.queries.values()
+        )
 
     def close(self):
         """Close the connection to the client. This also notifies all pending queries that their
@@ -108,8 +108,7 @@ class Client(object):
         try:
             self.socket.sendall(message)
         except socket.error as e:
-            self.logger.info(
-                "Blame: Error sending vuln_notify to %s: %s." % (self.address, e))
+            self.logger.info(f"Blame: Error sending vuln_notify to {self.address}: {e}.")
             return False
 
         self.queries[txid] = Client.Callback(
@@ -123,14 +122,29 @@ class Client(object):
         self.last_used = time.time()
         txid = self.next_txid
 
-        message = unicode("%d vuln_notify %s %s %s %d %s\n" %
-            (txid, id, type, server_addr, server_port,
-             ", ".join(
-                 ["%s %s" % (urllib.quote(app.package), app.version) for app in applications])))
+        message = unicode(
+            (
+                "%d vuln_notify %s %s %s %d %s\n"
+                % (
+                    txid,
+                    id,
+                    type,
+                    server_addr,
+                    server_port,
+                    ", ".join(
+                        [
+                            f"{urllib.quote(app.package)} {app.version}"
+                            for app in applications
+                        ]
+                    ),
+                )
+            )
+        )
+
         try:
             self.socket.sendall(message)
         except socket.error as e:
-            self.logger.info("AppBlame notify error for %s, %s." % (self.address, e))
+            self.logger.info(f"AppBlame notify error for {self.address}, {e}.")
             return False
 
         self.queries[txid] = Client.Callback(
@@ -202,7 +216,7 @@ class Client(object):
                 self.socket.sendall("400 Error parsing message\n\n")
             except socket.error:
                 pass
-            self.logger.info("Blame: Bad handshake from %s: %s" % (self.address, e))
+            self.logger.info(f"Blame: Bad handshake from {self.address}: {e}")
             return False
         # TODO: Handle any extra data after the handshake, there shouldn't be
         # any in the current version of the protocol.
@@ -221,17 +235,12 @@ class Client(object):
         attacks = self.info.get("Attacks", self.server.default_attacks)
         attacks_str = ",".join([attack.name for attack in attacks])
         self.socket.sendall("Attacks: %s\n" % attacks_str)
-        supported_str = ",".join([
-            attack
-            for attack in
-            handlers.connection.handlers.map])
+        supported_str = ",".join(list(handlers.connection.handlers.map))
         self.socket.sendall("Supported-Attacks: %s\n" % supported_str)
         data = self.info.get("Data-Attacks", self.server.default_data)
         data_str = ",".join([attack.name for attack in data])
         self.socket.sendall("Data-Attacks: %s\n" % data_str)
-        supported_data = ",".join([
-            attack
-            for attack in handlers.data.handlers.map])
+        supported_data = ",".join(list(handlers.data.handlers.map))
         self.socket.sendall("Supported-Data-Attacks: %s\n" % supported_data)
         self.socket.sendall("\n")
 
@@ -240,9 +249,7 @@ class Client(object):
         headers = {entry.strip(): header.strip()
                    for entry, header in raw_headers}
 
-        client_info = {}
-        # Platform-Info is required, fail if not present
-        client_info["Platform-Info"] = headers["Platform-Info"]
+        client_info = {"Platform-Info": headers["Platform-Info"]}
         # Everything else is optional
         if "Installation-ID" in headers:
             client_info["Installation-ID"] = headers["Installation-ID"]
@@ -298,8 +305,7 @@ class Client(object):
         words = line.strip().split(" ")
         txid = int(words[0])
         data = " ".join(words[1:])
-        callback = self.queries.get(txid)
-        if callback:
+        if callback := self.queries.get(txid):
             del self.queries[txid]
             callback.fn(True, data)
         else:
@@ -348,8 +354,7 @@ class Server:
         client_addr, client_port = client_address
         self.logger.debug("Blame: Connection from %s:%d", client_addr, client_port)
 
-        old_client = self.clients.get(client_addr, None)
-        if old_client:
+        if old_client := self.clients.get(client_addr, None):
             self.remove_client(old_client)
         client = Client(client_socket, self)
         self.fd_map[client_socket] = client

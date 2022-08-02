@@ -53,7 +53,9 @@ class DataHandler(base.BaseHandler):
         if apps is None:
             return "Unknown"
         info, apps = apps
-        return "client=%s " % info + ", ".join([
-            "application=\"%s\" version=\"%s\"" %
-            (app.package, app.version)
-            for app in apps])
+        return f"client={info} " + ", ".join(
+            [
+                "application=\"%s\" version=\"%s\"" % (app.package, app.version)
+                for app in apps
+            ]
+        )

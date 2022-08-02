@@ -53,7 +53,7 @@ class CallbackMap(object):
                 del self.map[id]
 
     def call(self, id, data):
-        if not id in self.map:
+        if id not in self.map:
             raise KeyError()
         entry = self.map[id]
         cont = entry.func(data)
@@ -75,20 +75,18 @@ class ClientReportDetection(DataHandler):
     def on_request(self, request):
         callbacks.sweep(force=False)
         http = util.http.parse_request(request)
-        if not (http and not http.error_code):
+        if not http or http.error_code:
             return request
         url = http.path
-        match = re.match(".*%s:(.*)$" % (self.token), url)
+        match = re.match(f".*{self.token}:(.*)$", url)
         if not match:
             return request
 
         try:
-            id, data = match.group(1).split(",", 1)
+            id, data = match[1].split(",", 1)
             id = base64.standard_b64decode(id)
         except ValueError:
-            self.log(
-                logging.DEBUG,
-                "Malformed data from client: %s" % (match.group(1)))
+            self.log(logging.DEBUG, f"Malformed data from client: {match[1]}")
             return request
         try:
             callbacks.call(id, data)
@@ -96,7 +94,7 @@ class ClientReportDetection(DataHandler):
             self.log(logging.DEBUG, "Got request for expired handler, id=" % id)
 
         # Strip out the data and send it along
-        return request.replace("?%s:%s" % (self.token, match.group(1)), "", 1)
+        return request.replace(f"?{self.token}:{match[1]}", "", 1)
 
     @staticmethod
     def add_callback_url(callback, base_url, data="", timeout=2):
@@ -118,5 +116,4 @@ class ClientReportDetection(DataHandler):
         """
         id = callbacks.add(callback, timeout=timeout)
         id = base64.standard_b64encode(str(id))
-        url = base_url + "?%s:%s,%s" % (ClientReportDetection.token, id, data)
-        return url
+        return base_url + f"?{ClientReportDetection.token}:{id},{data}"

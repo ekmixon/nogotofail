@@ -27,8 +27,6 @@ def parse_ssl2(message, enforce_length=True):
     """
     try:
         record, size = types.Sslv2Record.from_stream(message)
-        if enforce_length and size != len(message):
-            return None
-        return record
+        return None if enforce_length and size != len(message) else record
     except (IndexError, ValueError, struct.error) as e:
         return None

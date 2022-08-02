@@ -83,13 +83,13 @@ class Server:
         self._remove_fds(connection)
 
     def setup_connection(self, client_socket):
-        if self.block_non_clients:
-            if not self.app_blame.client_available(
-                client_socket.getpeername()[0]):
-                self.logger.debug("Connection from non-client %s blocked",
-                                  client_socket.getpeername()[0])
-                client_socket.close()
-                return
+        if self.block_non_clients and not self.app_blame.client_available(
+            client_socket.getpeername()[0]
+        ):
+            self.logger.debug("Connection from non-client %s blocked",
+                              client_socket.getpeername()[0])
+            client_socket.close()
+            return
         connection = (
             self.connection_class(
                 self, client_socket,
@@ -154,19 +154,20 @@ class Server:
         return sockets
 
     def _remove_fds(self, connection):
-        if connection in self.fds:
-            r, w, x = self.fds[connection]
-            for fd in r:
-                self.read_fds.remove(fd)
-                self.connections.pop(fd)
-            for fd in w:
-                self.write_fds.remove(fd)
-                self.connections.pop(fd)
-            for fd in x:
-                self.ex_fds.remove(fd)
-                self.connections.pop(fd)
+        if connection not in self.fds:
+            return
+        r, w, x = self.fds[connection]
+        for fd in r:
+            self.read_fds.remove(fd)
+            self.connections.pop(fd)
+        for fd in w:
+            self.write_fds.remove(fd)
+            self.connections.pop(fd)
+        for fd in x:
+            self.ex_fds.remove(fd)
+            self.connections.pop(fd)
 
-            del self.fds[connection]
+        del self.fds[connection]
 
     def _on_server_socket_select(self, fd):
         client_socket, client_address = None, (None, None)
@@ -176,7 +177,9 @@ class Server:
             self.setup_connection(client_socket)
         except socket.error as e:
             self.logger.error(
-                "Socket error in connection startup from %s" % client_address[0])
+                f"Socket error in connection startup from {client_address[0]}"
+            )
+
             self.logger.exception(e)
             util.close_quietly(client_socket)
 

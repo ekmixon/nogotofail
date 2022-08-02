@@ -60,10 +60,12 @@ class LoggingHandler(base.BaseConnectionHandler):
         if apps is None:
             return "Unknown"
         info, apps = apps
-        return "client=%s " % info + ", ".join([
-            "application=\"%s\" version=\"%s\"" %
-            (app.package, app.version)
-            for app in apps])
+        return f"client={info} " + ", ".join(
+            [
+                "application=\"%s\" version=\"%s\"" % (app.package, app.version)
+                for app in apps
+            ]
+        )
 
     def on_select(self):
         self.log(logging.INFO, "Selected for connection")
@@ -72,7 +74,7 @@ class LoggingHandler(base.BaseConnectionHandler):
         self.log(logging.INFO, "Connection established")
 
     def on_ssl_error(self, error):
-        self.log(logging.DEBUG, "SSL exception: %s " % error)
+        self.log(logging.DEBUG, f"SSL exception: {error} ")
 
     def on_close(self, handler_initiated):
         if handler_initiated:
